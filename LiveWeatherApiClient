@@ -1,1 +1,78 @@
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Scanner;
 
+public class LiveWeatherApiClient {
+    public static void main(String[] args) {
+        try {
+            Scanner scanner = new Scanner(System.in);
+            System.out.print("Enter city name: ");
+            String city = scanner.nextLine().trim();
+
+            // Step 1: Get coordinates from geocoding API
+            String geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + city;
+            URL urlGeo = new URL(geoUrl);
+            HttpURLConnection connGeo = (HttpURLConnection) urlGeo.openConnection();
+            connGeo.setRequestMethod("GET");
+
+            BufferedReader readerGeo = new BufferedReader(new InputStreamReader(connGeo.getInputStream()));
+            StringBuilder geoResponse = new StringBuilder();
+            String lineGeo;
+            while ((lineGeo = readerGeo.readLine()) != null) {
+                geoResponse.append(lineGeo);
+            }
+            readerGeo.close();
+
+            String geoJson = geoResponse.toString();
+            if (!geoJson.contains("\"results\"")) {
+                System.out.println("City not found. Try a valid city name.");
+                return;
+            }
+
+            String latitude = geoJson.split("\"latitude\":")[1].split(",")[0];
+            String longitude = geoJson.split("\"longitude\":")[1].split(",")[0];
+
+            // Step 2: Get weather data using coordinates
+            String weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + latitude +
+                                "&longitude=" + longitude + "&current_weather=true";
+            URL urlWeather = new URL(weatherUrl);
+            HttpURLConnection connWeather = (HttpURLConnection) urlWeather.openConnection();
+            connWeather.setRequestMethod("GET");
+
+            BufferedReader readerWeather = new BufferedReader(new InputStreamReader(connWeather.getInputStream()));
+            StringBuilder weatherResponse = new StringBuilder();
+            String lineWeather;
+            while ((lineWeather = readerWeather.readLine()) != null) {
+                weatherResponse.append(lineWeather);
+            }
+            readerWeather.close();
+
+            String weatherJson = weatherResponse.toString();
+            if (!weatherJson.contains("\"current_weather\"")) {
+                System.out.println("Weather data not available for this location.");
+                return;
+            }
+
+            // Extract current_weather block
+            String currentWeatherBlock = weatherJson.split("\"current_weather\":\\{")[1].split("}")[0];
+
+            // Parse values from current_weather block
+            String temperature = currentWeatherBlock.split("\"temperature\":")[1].split(",")[0];
+            String windspeed = currentWeatherBlock.split("\"windspeed\":")[1].split(",")[0];
+            String time = currentWeatherBlock.split("\"time\":\"")[1].split("\"")[0];
+
+            // Step 3: Display structured output
+            System.out.println("\n📍 Weather in " + city + ":");
+            System.out.println("Latitude: " + latitude);
+            System.out.println("Longitude: " + longitude);
+            System.out.println("Temperature: " + temperature + "°C");
+            System.out.println("Wind Speed: " + windspeed + " km/h");
+            System.out.println("Time: " + time);
+
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+}
